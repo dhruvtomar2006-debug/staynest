@@ -4,7 +4,7 @@ import ListingCard from '../components/ListingCard.jsx';
 import Loader from '../components/Loader.jsx';
 import { STAY_TYPES } from '../utils/format.js';
 
-const initial = { city: '', type: '', guests: '', maxPrice: '' };
+const initial = { city: '', type: '', guests: '', maxPrice: '', checkIn: '', checkOut: '' };
 
 export default function Home() {
   const [filters, setFilters] = useState(initial);
@@ -47,6 +47,8 @@ export default function Home() {
           </select>
           <input type="number" min="1" placeholder="Guests" value={filters.guests} onChange={set('guests')} />
           <input type="number" min="0" placeholder="Max ₹/night" value={filters.maxPrice} onChange={set('maxPrice')} />
+          <input type="date" placeholder="Check-in" value={filters.checkIn} onChange={set('checkIn')} />
+          <input type="date" placeholder="Check-out" value={filters.checkOut} onChange={set('checkOut')} />
           <button className="btn">Search</button>
         </form>
       </div>

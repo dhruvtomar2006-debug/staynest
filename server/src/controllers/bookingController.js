@@ -22,7 +22,15 @@ export const createBooking = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Check-out must be at least one day after check-in');
   }
-  // TODO: reject check-in dates in the past.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkInDate = new Date(start);
+  checkInDate.setHours(0, 0, 0, 0);
+
+  if (checkInDate < today) {
+    res.status(400);
+    throw new Error('Check-in date cannot be in the past');
+  }
 
   if (guests > listing.maxGuests) {
     res.status(400);

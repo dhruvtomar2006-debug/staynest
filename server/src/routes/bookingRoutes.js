@@ -5,6 +5,7 @@ import {
   getHostBookings,
   cancelBooking,
   updateBookingStatus,
+  getHostStats,
 } from '../controllers/bookingController.js';
 import { protect, hostOnly } from '../middleware/auth.js';
 
@@ -15,6 +16,7 @@ router.use(protect);
 router.post('/', createBooking);
 router.get('/mine', getMyBookings);
 router.get('/host', hostOnly, getHostBookings);
+router.get('/host/stats', hostOnly, getHostStats);
 router.patch('/:id/cancel', cancelBooking);
 router.patch('/:id/status', hostOnly, updateBookingStatus);
 

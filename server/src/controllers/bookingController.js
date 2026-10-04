@@ -1,6 +1,8 @@
 import Booking from '../models/Booking.js';
 import Listing from '../models/Listing.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { sendEmail } from '../utils/mailer.js';
+import { newBookingHostTemplate, bookingStatusGuestTemplate } from '../templates/bookingTemplates.js';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -8,7 +10,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 export const createBooking = asyncHandler(async (req, res) => {
   const { listingId, checkIn, checkOut, guests } = req.body;
 
-  const listing = await Listing.findById(listingId);
+  const listing = await Listing.findById(listingId).populate('host', 'name email');
   if (!listing || !listing.isActive) {
     res.status(404);
     throw new Error('Listing not available');
@@ -22,20 +24,38 @@ export const createBooking = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Check-out must be at least one day after check-in');
   }
-  // TODO: reject check-in dates in the past.
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkInDate = new Date(start);
+  checkInDate.setHours(0, 0, 0, 0);
+
+  if (checkInDate < today) {
+    res.status(400);
+    throw new Error('Check-in date cannot be in the past');
+  }
 
   if (guests > listing.maxGuests) {
     res.status(400);
     throw new Error(`This stay allows a maximum of ${listing.maxGuests} guests`);
   }
 
-  if (listing.host.equals(req.user._id)) {
+  if (listing.host._id.equals(req.user._id)) {
     res.status(400);
     throw new Error('You cannot book your own listing');
   }
 
-  // BUG: there is no check for overlapping bookings, so the same
-  // dates can be booked twice. See "Prevent double booking" issue.
+  const existingBooking = await Booking.findOne({
+    listing: listing._id,
+    status: { $in: ['pending', 'confirmed'] },
+    checkIn: { $lt: end },
+    checkOut: { $gt: start },
+  });
+
+  if (existingBooking) {
+    res.status(409);
+    throw new Error('These dates are already booked');
+  }
 
   const booking = await Booking.create({
     listing: listing._id,
@@ -46,6 +66,23 @@ export const createBooking = asyncHandler(async (req, res) => {
     nights,
     totalPrice: nights * listing.pricePerNight,
   });
+
+  // Non-blocking email notification to host
+  if (listing.host && listing.host.email) {
+    sendEmail({
+      to: listing.host.email,
+      subject: `New Booking Request for ${listing.title}`,
+      html: newBookingHostTemplate({
+        hostName: listing.host.name,
+        guestName: req.user.name,
+        listingTitle: listing.title,
+        checkIn: start,
+        checkOut: end,
+        guests,
+        totalPrice: booking.totalPrice,
+      }),
+    }).catch((err) => console.error('Email send error:', err.message));
+  }
 
   res.status(201).json(booking);
 });
@@ -91,7 +128,9 @@ export const cancelBooking = asyncHandler(async (req, res) => {
 // PATCH /api/bookings/:id/status (host of the listing)
 export const updateBookingStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const booking = await Booking.findById(req.params.id).populate('listing', 'host');
+  const booking = await Booking.findById(req.params.id)
+    .populate('listing', 'title host')
+    .populate('guest', 'name email');
   if (!booking) {
     res.status(404);
     throw new Error('Booking not found');
@@ -106,5 +145,22 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
   }
   booking.status = status;
   await booking.save();
+
+  // Non-blocking email notification to guest when confirmed or cancelled/declined
+  if (['confirmed', 'cancelled'].includes(status) && booking.guest && booking.guest.email) {
+    const displayStatus = status === 'cancelled' ? 'declined' : status;
+    sendEmail({
+      to: booking.guest.email,
+      subject: `Booking Request ${displayStatus.toUpperCase()} - ${booking.listing.title}`,
+      html: bookingStatusGuestTemplate({
+        guestName: booking.guest.name,
+        listingTitle: booking.listing.title,
+        status: displayStatus,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+      }),
+    }).catch((err) => console.error('Email send error:', err.message));
+  }
+
   res.json(booking);
 });

@@ -116,4 +116,54 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; colo
 .empty { text-align: center; padding: 60px 0; }
 .footer { text-align: center; color: var(--muted); padding: 24px; border-top: 1px solid var(--border); }
 
-/* TODO: detail-layout and search-bar break on mobile (<768px) - see "Mobile responsive" issue */
+/* Mobile responsive — fixes #5 */
+@media (max-width: 768px) {
+  /* Search bar stacks vertically */
+  .search-bar {
+    flex-direction: column;
+  }
+  .search-bar input:first-child {
+    flex: unset;
+  }
+
+  /* Listing detail switches from 2-col to 1-col */
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Booking box is no longer sticky on mobile */
+  .booking-box {
+    position: static;
+  }
+
+  /* Trip cards stack image above details */
+  .trip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .trip img {
+    width: 100%;
+    height: 200px;
+  }
+  .trip-side {
+    align-items: flex-start;
+  }
+
+  /* Host dashboard table scrolls horizontally */
+  .table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Navbar wraps on very small screens */
+  .navbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* Hero heading size reduction */
+  .hero h1 {
+    font-size: 1.6rem;
+  }
+}

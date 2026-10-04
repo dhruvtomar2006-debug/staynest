@@ -69,9 +69,25 @@ export const updateListing = asyncHandler(async (req, res) => {
 // DELETE /api/listings/:id (owner host)
 export const deleteListing = asyncHandler(async (req, res) => {
   const listing = await findOwnedListing(req, res);
-  await listing.deleteOne();
-  // TODO: what should happen to existing bookings and reviews? See issue tracker.
-  res.json({ message: 'Listing deleted' });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const hasUpcomingBookings = await Booking.exists({
+    listing: listing._id,
+    status: 'confirmed',
+    checkOut: { $gte: today },
+  });
+
+  if (hasUpcomingBookings) {
+    res.status(400);
+    throw new Error('Cannot delete listing with upcoming confirmed bookings');
+  }
+
+  listing.isActive = false;
+  await listing.save();
+
+  res.json({ message: 'Listing deactivated successfully' });
 });
 
 // GET /api/listings/:id/reviews
